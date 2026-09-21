@@ -1,0 +1,28 @@
+name: XAUUSD Alert Bot
+
+on:
+  schedule:
+    # Runs every 15 minutes (matches the M15 chart)
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}   # lets you also run it manually from the Actions tab
+
+jobs:
+  check-setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run the alert check
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python xauusd_alert_bot.py once
