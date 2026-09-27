@@ -52,6 +52,7 @@ TP_RR = 3.0                 # take profit as a multiple of the SL distance (1:3)
 ENTRY_BUFFER_USD = 0.20     # pending order placed this far beyond the tap candle
 TYPICAL_SPREAD_USD = 0.30   # <-- set this to your broker's typical XAUUSD spread
 SPREAD_WARN_RATIO = 0.15    # warn if spread > 15% of the SL distance
+MAX_ENTRY_DISTANCE_USD = 5.0  # skip the alert if entry is more than this far from current price
 CHECK_EVERY_SECONDS = 60
 # ---------------------------------------------------------------------------
 
@@ -143,6 +144,12 @@ def check_for_setup(max_age_minutes=None):
     ma = float(tap["ma"])
     current_price = float(m15["Close"].iloc[-1])  # latest available price
 
+    # Debug: how stale is this data? Helps spot feed-lag issues.
+    candle_close_time = to_utc(candle_time) + pd.Timedelta(minutes=15)
+    data_age_min = (pd.Timestamp.now(tz="UTC") - candle_close_time).total_seconds() / 60
+    print(f"[debug] tap candle closed {data_age_min:.1f} min ago, "
+          f"current_price={current_price:.2f}")
+
     side = None
     if bias == "BULLISH" and low <= ma <= close:
         # candle dipped to/through the MA but closed back above it
@@ -163,6 +170,12 @@ def check_for_setup(max_age_minutes=None):
     else:
         return None
 
+    entry_distance = abs(entry - current_price)
+    if entry_distance > MAX_ENTRY_DISTANCE_USD:
+        print(f"[debug] setup found but skipped - entry is ${entry_distance:.2f} "
+              f"from current price (limit ${MAX_ENTRY_DISTANCE_USD:.2f})")
+        return None
+
     spread_note = ""
     if TYPICAL_SPREAD_USD > risk * SPREAD_WARN_RATIO:
         spread_note = (
@@ -176,7 +189,7 @@ def check_for_setup(max_age_minutes=None):
         f"Market Condition: {condition}\n"
         f"Current Price: {current_price:.2f}\n"
         f"Trade Setup: {side}\n"
-        f"Entry: {entry:.2f}\n"
+        f"Entry: {entry:.2f}  (${entry_distance:.2f} from current price)\n"
         f"Stop Loss: {sl:.2f}\n"
         f"Take Profit: {tp:.2f}\n"
         f"Reasoning: M15 candle at {candle_time} tapped the 50 MA "
@@ -227,3 +240,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+  
